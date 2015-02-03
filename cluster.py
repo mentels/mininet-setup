@@ -18,25 +18,25 @@ def setupIperfPair(client, server):
     teardownIperfServer(server)
 
 def setupIperfServer(host):
-    serverFile = getIperfServerFilename(host)
-    cmd = 'touch %s && iperf -s -u -l 1470' % serverFile
-    host.sendCmd(cmd)
+    cmd = 'iperf -s'
+    serverRet = host.sendCmd(cmd)
 
 def setupIperfClient(client, server):
     outFile = getIperfServerFilename(server)
-    header  = '== SRC:%s DST:%s ==' % (client.IP(), server.IP())
-    headerCmd = 'echo %s >> %s' % (header, outFile)
-    clientCmd = 'iperf -c %s -u -l 1470 -b 1m >> %s' % (server.IP(), outFile)
+    header  = '\"== SRC:%s DST:%s ==\"' % (client.IP(), server.IP())
+    headerCmd = 'echo %s > %s' % (header, outFile)
+    clientCmd = 'iperf -c %s -t 1s >> %s' % (server.IP(), outFile)
     client.sendCmd('%s && %s' % (headerCmd, clientCmd))
 
 def checkIperfClientCompleted(client):
-    client.monitor()
+    client.monitor(timeoutms=500)
     if client.waiting:
         return False
     return True
 
 def teardownIperfServer(server):
     server.sendInt()
+    server.waitOutput()
 
 def getIperfServerFilename(server):
     return '%s-%s.iperf' % (server.name, server.IP())
@@ -50,6 +50,7 @@ def run():
     h1 = net.hosts[0]
     h2 = net.hosts[1]
     setupIperfPair(h1,h2)
+    setupIperfPair(h2,h1)
     CLI (net)
     net.stop()
 
