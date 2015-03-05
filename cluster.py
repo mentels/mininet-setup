@@ -21,22 +21,24 @@ def formatPairCmd(host, peer, state, no):
     cmd = 'cd pair && make dev state={state} ip="{ip}" \
     peer_ip="{peer_ip}" pair_no={no} it={it} intf={intf}'
     return cmd.format(state=state,
-                      ip=host.IP(),
-                      peer_ip=peer.IP(),
+                      ip=formatIP(host.IP()),
+                      peer_ip=formatIP(peer.IP()),
                       no=no,
                       it=10,
-                      intf=host.intfs[0].str())
+                      intf=host.intfs[0])
 
 
 def designatePairs(hosts):
     pairs = []
     pair_no = 1
     for i in range(0, len(hosts) - 1, 2):
-        pair = (pair_no, hosts([i]), hosts[i+1])
+        pair = (pair_no, hosts[i], hosts[i+1])
         pairs.append(pair)
         pair_no += 1
     return pairs
 
+def formatIP(ip):
+  '{' + ip.replace('.', ',') + '}'
 
 def run():
     servers = ['localhost', 'mn2']
