@@ -13,12 +13,16 @@ import time
 DEFAULT_PORT = 8099
 
 
-def runPair(pair):
+def runPassiveHosts(pair):
     (no, port, activeHost, passiveHost) = pair
     info('*** Starting pair no: %d \n' % no)
     passiveCmd = formatPairCmd(sysConfigFile(no, 'passive'))
     passiveHost.cmd(passiveCmd)
     info('Started passive on %s: %s \n' % (passiveHost.name, passiveCmd))
+
+
+def runActiveHosts(pair):
+    (no, port, activeHost, passiveHost) = pair
     activeCmd = formatPairCmd(sysConfigFile(no, 'active'))
     activeHost.cmd(activeCmd)
     info('Started active on %s: %s \n' % (activeHost.name, activeCmd))
@@ -104,7 +108,8 @@ def run():
     net.start()
     pairs = designatePairs(net.hosts)
     [generatePairSysConfigs(p) for p in pairs]
-    [runPair(p) for p in pairs]
+    [runPassiveHosts(p) for p in pairs]
+    [runActiveHosts(p) for p in pairs]
     CLI(net)
     net.stop(),
     os.system("pkill -9 beam")
