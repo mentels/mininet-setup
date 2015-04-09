@@ -46,14 +46,17 @@ def designatePairs(hosts):
 
 def generatePairSysConfigs(pair):
     (no, port, activeHost, passiveHost) = pair
-    generateSysConfig(no, port, activeHost, passiveHost, 10, 'active')
-    generateSysConfig(no, port, passiveHost, activeHost, 10, 'passive')
+    generateSysConfig(no, port, activeHost, passiveHost, 50, 'active')
+    generateSysConfig(no, port, passiveHost, activeHost, 50, 'passive')
 
 
 def sysConfigFile(no, state):
     pattern = filePattern(no, state, 'config')
     return os.path.join(os.environ['HOME'], 'pair', 'config',
                         pattern)
+
+def sysConfigGenScript():
+    return os.path.join(os.environ['HOME'], 'pair', 'config_gen')
 
 
 def logFile(no, state):
@@ -67,42 +70,55 @@ def filePattern(no, state, ext):
 
 
 def generateSysConfig(no, port, host, peer, iterations, state):
-    cfg = '[(pair,\n{pair_cfg}),\n(lager,\n{lager_cfg})].\n'
-    pair_cfg = pairConfig(no, port, host, peer, iterations, state)
-    lager_cfg = lagerConfig(no, state)
-    formatted = cfg.format(pair_cfg=pair_cfg, lager_cfg=lager_cfg)
-    formatted = formatted.replace('(', '{').replace(')', '}')
-    with open(sysConfigFile(no, state), 'w') as f:
-        f.write(formatted)
+    # cfg = '[(pair,\n{pair_cfg}),\n(lager,\n{lager_cfg})].\n'
+    # pair_cfg = pairConfig(no, port, host, peer, iterations, state)
+    # lager_cfg = lagerConfig(no, state)
+    # formatted = cfg.format(pair_cfg=pair_cfg, lager_cfg=lager_cfg)
+    # formatted = formatted.replace('(', '{').replace(')', '}')
+    # with open(sysConfigFile(no, state), 'w') as f:
+    #     f.write(formatted)
+    cmd = '{script} {no} {port} {ip} {peer_ip} {intf} {it} {state} {cfg_file} {log_file}'
+    formatted = cmd.format(script=sysConfigGenScript(),
+                           no=no,
+                           port=port,
+                           ip=host.IP(),
+                           peer_ip=peer.IP(),
+                           intf=host.intfs[0],
+                           it=iterations,
+                           state=state,
+                           cfg_file=sysConfigFile(no, state),
+                           log_file=logFile(no, state))
+    # info('*** Generating sys.config with %s' % formatted)
+    host.cmd(formatted)
 
 
-def pairConfig(no, port, host, peer, iterations, state):
-    cfg = '[(pair_no, {no}), \n\
-(port, {port}), \n\
-(ip, "{ip}"), \n\
-(peer_ip, "{peer_ip}"), \n\
-(intf_name, \'{intf}\'), \n\
-(iterations, {it}), \n\
-(state, {state})]'
-    return cfg.format(no=no,
-                      port=port,
-                      ip=host.IP(),
-                      peer_ip=peer.IP(),
-                      intf=host.intfs[0],
-                      it=iterations,
-                      state=state)
+# def pairConfig(no, port, host, peer, iterations, state):
+#     cfg = '[(pair_no, {no}), \n\
+# (port, {port}), \n\
+# (ip, "{ip}"), \n\
+# (peer_ip, "{peer_ip}"), \n\
+# (intf_name, \'{intf}\'), \n\
+# (iterations, {it}), \n\
+# (state, {state})]'
+#     return cfg.format(no=no,
+#                       port=port,
+#                       ip=host.IP(),
+#                       peer_ip=peer.IP(),
+#                       intf=host.intfs[0],
+#                       it=iterations,
+#                       state=state)
 
 
-def lagerConfig(no, state):
-    cfg = '[(handlers, [\n\
-(lager_file_backend, [(file, "{log_file}"), (level, info)])])]'
-    return cfg.format(log_file=logFile(no, state))
+# def lagerConfig(no, state):
+#     cfg = '[(handlers, [\n\
+# (lager_file_backend, [(file, "{log_file}"), (level, info)])])]'
+#     return cfg.format(log_file=logFile(no, state))
 
 
 def run():
-    servers = ['localhost']  # , 'mn2']
+    servers = ['localhost', 'mn2']
     # k switches n hosts
-    topo = LinearTopo(k=1, n=2, sopts={'protocols': 'OpenFlow13'})
+    topo = LinearTopo(k=2, n=2, sopts={'protocols': 'OpenFlow13'})
     controller = RemoteController('c0', ip='192.168.56.1', port=6653)
     net = MininetCluster(topo=topo, servers=servers, controller=controller)
     net.start()
