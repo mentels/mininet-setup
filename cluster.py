@@ -9,30 +9,31 @@ from mininet.node import RemoteController
 from mininet.cli import CLI
 from mininet.util import quietRun
 import os
-import time
+import time, datetime
 
 DEFAULT_PORT = 8099
+servers = ['mn2']
 
 
-def runPassiveHosts(pair):
+def runPassiveHosts(run_id, pair):
     (no, port, activeHost, passiveHost) = pair
     info('*** Starting pair no: %d \n' % no)
-    passiveCmd = formatPairCmd(sysConfigFile(no, 'passive'))
+    passiveCmd = formatPairCmd(sysConfigFile(run_id, passiveHost.name, no, 'passive'))
     passiveHost.cmd(passiveCmd)
     info('Started passive on %s: %s \n' % (passiveHost.name, passiveCmd))
 
 
-def runActiveHosts(pair):
+def runActiveHosts(run_id, pair):
     (no, port, activeHost, passiveHost) = pair
-    activeCmd = formatPairCmd(sysConfigFile(no, 'active'))
+    activeCmd = formatPairCmd(sysConfigFile(run_id, activeHost.name, no, 'active'))
     activeHost.cmd(activeCmd)
     info('Started active on %s: %s \n' % (activeHost.name, activeCmd))
 
 
 def formatPairCmd(configFile):
-    [stripped, rest] = str.split(configFile, '.')
+    [config_file] = str.split(configFile, '.config')[:-1]
     cmd = 'cd ~/pair/ && ./_rel/pair/bin/pair -config {config} -detached'
-    return cmd.format(config=stripped)
+    return cmd.format(config=config_file)
 
 
 def designatePairs(hosts):
@@ -45,32 +46,59 @@ def designatePairs(hosts):
     return pairs
 
 
-def generatePairSysConfigs(pair):
+def createRunDirs(run_id):
+    log_dir = logDir(run_id)
+    config_dir = configDir(run_id)
+    cmd = 'mkdir %s && mkdir %s' % (log_dir, config_dir)
+    output = h.cmd(cmd)
+    if output:
+        raise ValueError("Failed to create dirs %s, %s. %s" % (log_dir,
+                                                               config_dir,
+                                                               output))
+
+
+def generatePairSysConfigs(run_id, pair):
     (no, port, activeHost, passiveHost) = pair
-    generateSysConfig(no, port, activeHost, passiveHost, 1, 'active')
-    generateSysConfig(no, port, passiveHost, activeHost, 1, 'passive')
+    generateSysConfig(run_id, no, port, activeHost, passiveHost, 1, 'active')
+    generateSysConfig(run_id, no, port, passiveHost, activeHost, 1, 'passive')
 
 
-def sysConfigFile(no, state):
-    pattern = filePattern(no, state, 'config')
-    return os.path.join(os.environ['HOME'], 'pair', 'config',
-                        pattern)
 
 def sysConfigGenScript():
     return os.path.join(os.environ['HOME'], 'pair', 'config_gen')
 
 
-def logFile(no, state):
-    pattern = filePattern(no, state, 'log')
-    return os.path.join(os.environ['HOME'], 'pair', 'log',
-                        pattern)
+
+def pairDir():
+    return os.path.join(os.environ['HOME'], 'pair')
 
 
-def filePattern(no, state, ext):
-    return 'sys-%d-%s.%s' % (no, state, ext)
+def configDir(run_id):
+    return os.path.join(pairDir(), 'files', run_id, 'config')
 
 
-def generateSysConfig(no, port, host, peer, iterations, state):
+def logDir(run_id):
+    return os.path.join(pairDir(), 'files', run_id, 'log')
+
+
+def logFile(run_id, host_name, no, state):
+    pattern = filePattern(host_name, no, state, 'log')
+    return os.path.join(logDir(run_id), pattern)
+
+
+def sysConfigFile(run_id, host_name, no, state):
+    pattern = filePattern(host_name, no, state, 'config')
+    return os.path.join(configDir(run_id), pattern)
+
+
+def filePattern(host_name, no, state, ext):
+    return '{host_name}-{pair_no}-{state}.{extension}'.format(host_name=host_name,
+                                                              pair_no=no,
+                                                              state=state,
+                                                              extension=ext)
+
+
+def generateSysConfig(run_id, no, port, host, peer, iterations, state):
     cmd = '{script} {no} {port} {ip} {peer_ip} {intf} {it} {state} {cfg_file} {log_file}'
     formatted = cmd.format(script=sysConfigGenScript(),
                            no=no,
@@ -80,8 +108,8 @@ def generateSysConfig(no, port, host, peer, iterations, state):
                            intf=host.intfs[0],
                            it=iterations,
                            state=state,
-                           cfg_file=sysConfigFile(no, state),
-                           log_file=logFile(no, state))
+                           cfg_file=sysConfigFile(run_id, host.name, no, state),
+                           log_file=logFile(run_id, host.name, no, state))
     output = host.cmd(formatted)
     if output:
         raise ValueError("Failed generating config file on %s: %s" % (host.name,
@@ -97,18 +125,46 @@ def killPairs(net):
     quietRun( cmd ),
     quietRun('pkill -9 beam')
 
+
+def runRmoteCmd(net, server, raw_cmd):
+    dest = '%s@%s' % ( net.user, net.serverIP[server] )
+    cmd = [ 'sudo', '-E', '-u', net.user ]
+    cmd += net.sshcmd + [ '-n', dest, raw_cmd ]
+    info( ' '.join( cmd ), '\n' )
+    return quietRun( cmd )
+
+
+def createDirs(run_id, net):
+    log_dir = logDir(run_id)
+    config_dir = configDir(run_id)
+    cmd = 'mkdir -p %s && mkdir -p %s' % (log_dir, config_dir)
+    for s in servers:
+        output = runRmoteCmd(net, s, cmd)
+        if output:
+            raise ValueError("Failed to create dirs %s, %s. %s" % (log_dir,
+                                                                   config_dir,
+                                                                   output))
+    output = quietRun(cmd)
+    if output:
+        raise ValueError("Failed to create dirs %s, %s. %s" % (log_dir,
+                                                               config_dir,
+                                                               output))
+
+
 def run():
-    servers = ['localhost', 'mn2']
+    run_id = datetime.datetime.now().isoformat()
     # k switches n hosts
-    topo = LinearTopo(k=1, n=2, sopts={'protocols': 'OpenFlow13'})
+    topo = LinearTopo(k=2, n=10, sopts={'protocols': 'OpenFlow13'})
     controller = RemoteController('c0', ip='192.168.56.1', port=6653)
-    net = MininetCluster(topo=topo, servers=servers, controller=controller)
+    net = MininetCluster(topo=topo, servers=['localhost'] + servers,
+                         controller=controller)
     net.start()
+    createDirs(run_id, net)
     try:
         pairs = designatePairs(net.hosts)
-        [generatePairSysConfigs(p) for p in pairs]
-        [runPassiveHosts(p) for p in pairs]
-        [runActiveHosts(p) for p in pairs]
+        [generatePairSysConfigs(run_id, p) for p in pairs]
+        [runPassiveHosts(run_id, p) for p in pairs]
+        [runActiveHosts(run_id, p) for p in pairs]
         CLI(net)
     except Exception, arg:
         error("ERROR: %s \n" % arg)
