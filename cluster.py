@@ -4,7 +4,7 @@
 
 from mininet.examples.cluster import MininetCluster
 from mininet.topo import LinearTopo
-from mininet.log import setLogLevel, info, debug
+from mininet.log import setLogLevel, info, debug, error
 from mininet.node import RemoteController
 from mininet.cli import CLI
 from mininet.util import quietRun
@@ -47,8 +47,8 @@ def designatePairs(hosts):
 
 def generatePairSysConfigs(pair):
     (no, port, activeHost, passiveHost) = pair
-    generateSysConfig(no, port, activeHost, passiveHost, 50, 'active')
-    generateSysConfig(no, port, passiveHost, activeHost, 50, 'passive')
+    generateSysConfig(no, port, activeHost, passiveHost, 1, 'active')
+    generateSysConfig(no, port, passiveHost, activeHost, 1, 'passive')
 
 
 def sysConfigFile(no, state):
@@ -82,8 +82,10 @@ def generateSysConfig(no, port, host, peer, iterations, state):
                            state=state,
                            cfg_file=sysConfigFile(no, state),
                            log_file=logFile(no, state))
-    # info('*** Generating sys.config with %s' % formatted)
-    host.cmd(formatted)
+    output = host.cmd(formatted)
+    if output:
+        raise ValueError("Failed generating config file on %s: %s" % (host.name,
+                                                                      formatted))
 
 
 def killPairs(net):
@@ -98,18 +100,22 @@ def killPairs(net):
 def run():
     servers = ['localhost', 'mn2']
     # k switches n hosts
-    topo = LinearTopo(k=2, n=10, sopts={'protocols': 'OpenFlow13'})
+    topo = LinearTopo(k=1, n=2, sopts={'protocols': 'OpenFlow13'})
     controller = RemoteController('c0', ip='192.168.56.1', port=6653)
     net = MininetCluster(topo=topo, servers=servers, controller=controller)
     net.start()
-    pairs = designatePairs(net.hosts)
-    [generatePairSysConfigs(p) for p in pairs]
-    [runPassiveHosts(p) for p in pairs]
-    [runActiveHosts(p) for p in pairs]
-    CLI(net)
-    net.stop(),
-    killPairs(net)
-    os.system("pkill -9 beam")
+    try:
+        pairs = designatePairs(net.hosts)
+        [generatePairSysConfigs(p) for p in pairs]
+        [runPassiveHosts(p) for p in pairs]
+        [runActiveHosts(p) for p in pairs]
+        CLI(net)
+    except Exception, arg:
+        error("ERROR: %s \n" % arg)
+    finally:
+        net.stop(),
+        killPairs(net)
+        os.system("pkill -9 beam")
 
 if __name__ == '__main__':
     setLogLevel('info')
