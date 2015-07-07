@@ -157,10 +157,10 @@ def waitForFinish(pairs):
     totalPairsNum = len(pairs)
     while pairs:
         doWaitForFinish(pairs, finishedPairs)
-        info("**** The %i/%i pairs finished, waiting for the rest..."
+        info("**** The %i/%i pairs finished, waiting for the rest...\n"
              % (len(finishedPairs), totalPairsNum))
         time.sleep(SLEEP_SECS)
-    info("**** All the %i pairs finished " % len(finishedPairs))
+    info("**** All the %i pairs finished\n" % len(finishedPairs))
 
 
 def doWaitForFinish(pairs, finishedPairs):
