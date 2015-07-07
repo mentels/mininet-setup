@@ -162,7 +162,7 @@ def run():
     try:
         pairs = designatePairs(net.hosts)
         setUpHostsFiles(run_id, pairs)
-        info("**** CURRENT RUN ID: %s" % run_id)
+        info("**** CURRENT RUN ID: %s\n" % run_id)
         [generatePairSysConfigs(p) for p in pairs]
         [runPassiveHosts(p) for p in pairs]
         [runActiveHosts(p) for p in pairs]
@@ -173,6 +173,7 @@ def run():
         net.stop(),
         killPairs(net)
         os.system("pkill -9 beam")
+        info("**** FINISHED RUN ID: %s\n" % run_id)
 
 if __name__ == '__main__':
     setLogLevel('info')
