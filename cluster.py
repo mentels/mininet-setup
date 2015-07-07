@@ -9,23 +9,23 @@ from mininet.node import RemoteController
 from mininet.cli import CLI
 from mininet.util import quietRun
 import os
-import time, datetime
+import datetime
 
 DEFAULT_PORT = 8099
 servers = ['mn2']
 
 
-def runPassiveHosts(run_id, pair):
+def runPassiveHosts(pair):
     (no, port, activeHost, passiveHost) = pair
     info('*** Starting pair no: %d \n' % no)
-    passiveCmd = formatPairCmd(sysConfigFile(run_id, passiveHost.name, no, 'passive'))
+    passiveCmd = formatPairCmd(passiveHost.config)
     passiveHost.cmd(passiveCmd)
     info('Started passive on %s: %s \n' % (passiveHost.name, passiveCmd))
 
 
-def runActiveHosts(run_id, pair):
+def runActiveHosts(pair):
     (no, port, activeHost, passiveHost) = pair
-    activeCmd = formatPairCmd(sysConfigFile(run_id, activeHost.name, no, 'active'))
+    activeCmd = formatPairCmd(activeHost.config)
     activeHost.cmd(activeCmd)
     info('Started active on %s: %s \n' % (activeHost.name, activeCmd))
 
@@ -46,27 +46,14 @@ def designatePairs(hosts):
     return pairs
 
 
-def createRunDirs(run_id):
-    log_dir = logDir(run_id)
-    config_dir = configDir(run_id)
-    cmd = 'mkdir %s && mkdir %s' % (log_dir, config_dir)
-    output = h.cmd(cmd)
-    if output:
-        raise ValueError("Failed to create dirs %s, %s. %s" % (log_dir,
-                                                               config_dir,
-                                                               output))
-
-
-def generatePairSysConfigs(run_id, pair):
+def generatePairSysConfigs(pair):
     (no, port, activeHost, passiveHost) = pair
-    generateSysConfig(run_id, no, port, activeHost, passiveHost, 1, 'active')
-    generateSysConfig(run_id, no, port, passiveHost, activeHost, 1, 'passive')
-
+    generateSysConfig(no, port, activeHost, passiveHost, 1, 'active')
+    generateSysConfig(no, port, passiveHost, activeHost, 1, 'passive')
 
 
 def sysConfigGenScript():
     return os.path.join(os.environ['HOME'], 'pair', 'config_gen')
-
 
 
 def pairDir():
@@ -92,14 +79,16 @@ def sysConfigFile(run_id, host_name, no, state):
 
 
 def filePattern(host_name, no, state, ext):
-    return '{host_name}-{pair_no}-{state}.{extension}'.format(host_name=host_name,
-                                                              pair_no=no,
-                                                              state=state,
-                                                              extension=ext)
+    return '{host_name}-{pair_no}-{state}.{extension}'.format(
+      host_name=host_name,
+      pair_no=no,
+      state=state,
+      extension=ext)
 
 
-def generateSysConfig(run_id, no, port, host, peer, iterations, state):
-    cmd = '{script} {no} {port} {ip} {peer_ip} {intf} {it} {state} {cfg_file} {log_file}'
+def generateSysConfig(no, port, host, peer, iterations, state):
+    cmd = '{script} {no} {port} {ip} {peer_ip} {intf} {it} {state} '
+    '{cfg_file} {log_file}'
     formatted = cmd.format(script=sysConfigGenScript(),
                            no=no,
                            port=port,
@@ -108,30 +97,30 @@ def generateSysConfig(run_id, no, port, host, peer, iterations, state):
                            intf=host.intfs[0],
                            it=iterations,
                            state=state,
-                           cfg_file=sysConfigFile(run_id, host.name, no, state),
-                           log_file=logFile(run_id, host.name, no, state))
+                           cfg_file=host.config,
+                           log_file=host.log)
     output = host.cmd(formatted)
     if output:
-        raise ValueError("Failed generating config file on %s: %s" % (host.name,
-                                                                      formatted))
+        raise ValueError("Failed generating config file on %s: %s"
+                         % (host.name, formatted))
 
 
 def killPairs(net):
-    ip  =  net.serverIP['mn2']
-    dest = '%s@%s' % ( net.user, ip )
-    cmd = [ 'sudo', '-E', '-u', net.user ]
-    cmd += net.sshcmd + [ '-n', dest, 'sudo pkill -9 beam' ]
-    info( ' '.join( cmd ), '\n' )
-    quietRun( cmd ),
+    ip = net.serverIP['mn2']
+    dest = '%s@%s' % (net.user, ip)
+    cmd = ['sudo', '-E', '-u', net.user]
+    cmd += net.sshcmd + ['-n', dest, 'sudo pkill -9 beam']
+    info(' '.join(cmd), '\n')
+    quietRun(cmd),
     quietRun('pkill -9 beam')
 
 
 def runRmoteCmd(net, server, raw_cmd):
-    dest = '%s@%s' % ( net.user, net.serverIP[server] )
-    cmd = [ 'sudo', '-E', '-u', net.user ]
-    cmd += net.sshcmd + [ '-n', dest, raw_cmd ]
-    info( ' '.join( cmd ), '\n' )
-    return quietRun( cmd )
+    dest = '%s@%s' % (net.user, net.serverIP[server])
+    cmd = ['sudo', '-E', '-u', net.user]
+    cmd += net.sshcmd + ['-n', dest, raw_cmd]
+    info(' '.join(cmd), '\n')
+    return quietRun(cmd)
 
 
 def createDirs(run_id, net):
@@ -151,6 +140,17 @@ def createDirs(run_id, net):
                                                                output))
 
 
+def setUpHostsFiles(run_id, pairs):
+    for p in pairs:
+        (no, port, activeHost, passiveHost) = p
+        activeHost.config = sysConfigFile(run_id, activeHost.name, no,
+                                          'active')
+        passiveHost.config = sysConfigFile(run_id, passiveHost.name, no,
+                                           'passive')
+        activeHost.log = logFile(run_id, activeHost.name, no, 'active')
+        passiveHost.log = logFile(run_id, passiveHost.name, no, 'passive')
+
+
 def run():
     run_id = datetime.datetime.now().isoformat()
     # k switches n hosts
@@ -162,9 +162,10 @@ def run():
     createDirs(run_id, net)
     try:
         pairs = designatePairs(net.hosts)
-        [generatePairSysConfigs(run_id, p) for p in pairs]
-        [runPassiveHosts(run_id, p) for p in pairs]
-        [runActiveHosts(run_id, p) for p in pairs]
+        setUpHostsFiles(run_id, pairs)
+        [generatePairSysConfigs(p) for p in pairs]
+        [runPassiveHosts(p) for p in pairs]
+        [runActiveHosts(p) for p in pairs]
         CLI(net)
     except Exception, arg:
         error("ERROR: %s \n" % arg)
