@@ -182,6 +182,16 @@ def hostFinished(host):
     return False
 
 
+def ensurePassiveStarted(pair):
+    (no, port, activeHost, passiveHost) = pair
+    output = ""
+    while not output:
+        output = passiveHost.cmd('grep "pair started" %s' % passiveHost.log)
+        if not output:
+            info('*** Waiting for host %s to start...\n' % passiveHost.name)
+            time.sleep(SLEEP_SECS)
+
+
 def run():
     run_id = datetime.datetime.now().isoformat()
     # k switches n hosts
@@ -197,6 +207,7 @@ def run():
         info("**** CURRENT RUN ID: %s\n" % run_id)
         [generatePairSysConfigs(p) for p in pairs]
         [runPassiveHosts(p) for p in pairs]
+        [ensurePassiveStarted(p) for p in pairs]
         [runActiveHosts(p) for p in pairs]
         waitForFinish(pairs)
     except Exception, arg:
