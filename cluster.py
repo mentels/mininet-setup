@@ -10,8 +10,10 @@ from mininet.cli import CLI
 from mininet.util import quietRun
 import os
 import datetime
+import time
 
 DEFAULT_PORT = 8099
+SLEEP_SECS = 3
 servers = ['mn2']
 
 
@@ -150,6 +152,36 @@ def setUpHostsFiles(run_id, pairs):
         passiveHost.log = logFile(run_id, passiveHost.name, no, 'passive')
 
 
+def waitForFinish(pairs):
+    finishedPairs = []
+    totalPairsNum = len(pairs)
+    while pairs:
+        doWaitForFinish(pairs, finishedPairs)
+        info("**** The %i/%i pairs finished, waiting for the rest..."
+             % (len(finishedPairs), totalPairsNum))
+        time.sleep(SLEEP_SECS)
+    info("**** All the %i pairs finished " % len(finishedPairs))
+
+
+def doWaitForFinish(pairs, finishedPairs):
+    for p in pairs:
+        if pairFinished(p):
+            finishedPairs.append(p)
+            pairs.remove(p)
+
+
+def pairFinished(pair):
+    (no, port, activeHost, passiveHost) = pair
+    return hostFinished(activeHost) and hostFinished(passiveHost)
+
+
+def hostFinished(host):
+    output = host.cmd('grep Finished %s' % host.log)
+    if output:
+        return True
+    return False
+
+
 def run():
     run_id = datetime.datetime.now().isoformat()
     # k switches n hosts
@@ -166,7 +198,7 @@ def run():
         [generatePairSysConfigs(p) for p in pairs]
         [runPassiveHosts(p) for p in pairs]
         [runActiveHosts(p) for p in pairs]
-        CLI(net)
+        waitForFinish(pairs)
     except Exception, arg:
         error("ERROR: %s \n" % arg)
     finally:
