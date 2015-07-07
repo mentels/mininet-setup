@@ -102,7 +102,7 @@ def generateSysConfig(no, port, host, peer, iterations, state):
     output = host.cmd(formatted)
     if output:
         raise ValueError("Failed generating config file on %s: %s"
-                         % (host.name, formatted))
+                         % (host.name, output))
 
 
 def killPairs(net):
