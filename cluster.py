@@ -87,8 +87,7 @@ def filePattern(host_name, no, state, ext):
 
 
 def generateSysConfig(no, port, host, peer, iterations, state):
-    cmd = '{script} {no} {port} {ip} {peer_ip} {intf} {it} {state} '
-    '{cfg_file} {log_file}'
+    cmd = '{script} {no} {port} {ip} {peer_ip} {intf} {it} {state} {cfg_file} {log_file}'
     formatted = cmd.format(script=sysConfigGenScript(),
                            no=no,
                            port=port,
