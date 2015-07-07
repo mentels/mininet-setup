@@ -186,7 +186,8 @@ def ensurePassiveStarted(pair):
     (no, port, activeHost, passiveHost) = pair
     output = ""
     while not output:
-        output = passiveHost.cmd('grep "pair started" %s' % passiveHost.log)
+        output = passiveHost.cmd('grep -s "pair started" %s\n' % passiveHost.log)
+        debug('***** Starting %s output: %s' % (passiveHost, output))
         if not output:
             info('*** Waiting for host %s to start...\n' % passiveHost.name)
             time.sleep(SLEEP_SECS)
