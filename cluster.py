@@ -163,6 +163,7 @@ def run():
     try:
         pairs = designatePairs(net.hosts)
         setUpHostsFiles(run_id, pairs)
+        info("**** CURRENT RUN ID: %s" % run_id)
         [generatePairSysConfigs(p) for p in pairs]
         [runPassiveHosts(p) for p in pairs]
         [runActiveHosts(p) for p in pairs]
