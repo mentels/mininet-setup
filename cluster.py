@@ -11,9 +11,11 @@ from mininet.util import quietRun
 import os
 import datetime
 import time
+import socket
 
 DEFAULT_PORT = 8099
 SLEEP_SECS = 3
+CTRL_CMD_PORT = 6753
 servers = ['mn2']
 
 
@@ -194,6 +196,7 @@ def ensurePassiveStarted(pair):
 
 
 def run():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     run_id = datetime.datetime.now().isoformat()
     # k switches n hosts
     topo = LinearTopo(k=2, n=10, sopts={'protocols': 'OpenFlow13'})
@@ -217,6 +220,7 @@ def run():
         net.stop(),
         killPairs(net)
         os.system("pkill -9 beam")
+        sock.sendto("stop/%s" % run_id, ('192.168.56.1', CTRL_CMD_PORT))
         info("**** FINISHED RUN ID: %s\n" % run_id)
 
 if __name__ == '__main__':
