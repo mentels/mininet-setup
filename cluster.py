@@ -201,6 +201,7 @@ def ensurePassiveStarted(pair, sleep_secs):
 def setupControlerCommandChannel(local_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("", local_port))
+    sock.settimeout(5.0)
     return sock
 
 
