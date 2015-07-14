@@ -12,6 +12,7 @@ import os
 import datetime
 import time
 import socket
+import argparse
 
 DEFAULT_PORT = 8099
 SLEEP_SECS = 3
@@ -51,10 +52,10 @@ def designatePairs(hosts):
     return pairs
 
 
-def generatePairSysConfigs(pair):
+def generatePairSysConfigs(pair, iterations):
     (no, port, activeHost, passiveHost) = pair
-    generateSysConfig(no, port, activeHost, passiveHost, 1, 'active')
-    generateSysConfig(no, port, passiveHost, activeHost, 1, 'passive')
+    generateSysConfig(no, port, activeHost, passiveHost, iterations, 'active')
+    generateSysConfig(no, port, passiveHost, activeHost, iterations, 'passive')
 
 
 def sysConfigGenScript():
@@ -155,14 +156,14 @@ def setUpHostsFiles(run_id, pairs):
         passiveHost.log = logFile(run_id, passiveHost.name, no, 'passive')
 
 
-def waitForFinish(pairs):
+def waitForFinish(pairs, sleep_secs):
     finishedPairs = []
     totalPairsNum = len(pairs)
     while pairs:
         doWaitForFinish(pairs, finishedPairs)
         info("**** The %i/%i pairs finished, waiting for the rest...\n"
              % (len(finishedPairs), totalPairsNum))
-        time.sleep(SLEEP_SECS)
+        time.sleep(sleep_secs)
     info("**** All the %i pairs finished\n" % len(finishedPairs))
 
 
@@ -185,7 +186,7 @@ def hostFinished(host):
     return False
 
 
-def ensurePassiveStarted(pair):
+def ensurePassiveStarted(pair, sleep_secs):
     (no, port, activeHost, passiveHost) = pair
     output = ""
     while not output:
@@ -194,17 +195,17 @@ def ensurePassiveStarted(pair):
         debug('***** Starting %s output: %s' % (passiveHost, output))
         if not output:
             info('*** Waiting for host %s to start...\n' % passiveHost.name)
-            time.sleep(SLEEP_SECS)
+            time.sleep(sleep_secs)
 
 
-def setupControlerCommandChannel():
+def setupControlerCommandChannel(local_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("", CTRL_CMD_LOCAL_PORT))
+    sock.bind(("", local_port))
     return sock
 
 
-def ctrlPrepare(sock, run_id):
-    sock.sendto("prepare/%s" % run_id, ('192.168.56.1', CTRL_CMD_REMOTE_PORT))
+def ctrlPrepare(sock, run_id, remote_port):
+    sock.sendto("prepare/%s" % run_id, ('192.168.56.1', remote_port))
     msg = sock.recvfrom(1024)
     if msg != "ready":
         ValueError("Failed to prepare controller")
@@ -217,14 +218,16 @@ def teardownController(sock, run_id):
         ValueError("Failed to stop controller")
 
 
-def run():
+def run(args):
     run_id = datetime.datetime.now().isoformat()
-    sock = setupControlerCommandChannel()
-    ctrlPrepare(sock, run_id)
+    sock = setupControlerCommandChannel(args.ctrl_cmd_local_port)
+    ctrlPrepare(sock, run_id, args.ctrl_cmd_port)
     # k switches n hosts
-    topo = LinearTopo(k=2, n=10, sopts={'protocols': 'OpenFlow13'})
-    controller = RemoteController('c0', ip='192.168.56.1', port=6653)
-    net = MininetCluster(topo=topo, servers=['localhost'] + servers,
+    topo = LinearTopo(k=args.switches, n=args.hosts,
+                      sopts={'protocols': 'OpenFlow13'})
+    controller = RemoteController('c0', ip=args.ctrl_ip,
+                                  port=args.ctrl_of_port)
+    net = MininetCluster(topo=topo, servers=args.mn_hosts,
                          controller=controller)
     net.start()
     createDirs(run_id, net)
@@ -232,11 +235,11 @@ def run():
         pairs = designatePairs(net.hosts)
         setUpHostsFiles(run_id, pairs)
         info("**** CURRENT RUN ID: %s\n" % run_id)
-        [generatePairSysConfigs(p) for p in pairs]
+        [generatePairSysConfigs(p, args.iterations) for p in pairs]
         [runPassiveHosts(p) for p in pairs]
-        [ensurePassiveStarted(p) for p in pairs]
+        [ensurePassiveStarted(p, args.sleep_time) for p in pairs]
         [runActiveHosts(p) for p in pairs]
-        waitForFinish(pairs)
+        waitForFinish(pairs, args.sleep_time)
     except Exception, arg:
         error("ERROR: %s \n" % arg)
     finally:
@@ -247,5 +250,15 @@ def run():
         info("**** FINISHED RUN ID: %s\n" % run_id)
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Test Loom Switch')
+    parser.add_argument('--ctrl-ip', default='192.168.56.1')
+    parser.add_argument('--ctrl-of-port', type=int, default=6653)
+    parser.add_argument('--ctrl-cmd-port', type=int, default=6753)
+    parser.add_argument('--ctrl-cmd-local-port', type=int, default=6853)
+    parser.add_argument('--mn-hosts', nargs='+', default=["localhost"])
+    parser.add_argument('--switches', default=2, type=int)
+    parser.add_argument('--hosts', default=10, type=int)
+    parser.add_argument('--sleep-time', default=3, type=int)
+    parser.add_argument('--iterations', default=50, type=int)
     setLogLevel('info')
-    run()
+    run(parser.parse_args())
