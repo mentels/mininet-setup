@@ -15,7 +15,8 @@ import socket
 
 DEFAULT_PORT = 8099
 SLEEP_SECS = 3
-CTRL_CMD_PORT = 6753
+CTRL_CMD_REMOTE_PORT = 6753
+CTRL_CMD_LOCAL_PORT = 6853
 servers = ['mn2']
 
 
@@ -188,16 +189,38 @@ def ensurePassiveStarted(pair):
     (no, port, activeHost, passiveHost) = pair
     output = ""
     while not output:
-        output = passiveHost.cmd('grep -s "pair started" %s\n' % passiveHost.log)
+        output = passiveHost.cmd('grep -s "pair started" %s\n'
+                                 % passiveHost.log)
         debug('***** Starting %s output: %s' % (passiveHost, output))
         if not output:
             info('*** Waiting for host %s to start...\n' % passiveHost.name)
             time.sleep(SLEEP_SECS)
 
 
-def run():
+def setupControlerCommandChannel():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(("", CTRL_CMD_LOCAL_PORT))
+    return sock
+
+
+def ctrlPrepare(sock, run_id):
+    sock.sendto("prepare/%s" % run_id, ('192.168.56.1', CTRL_CMD_REMOTE_PORT))
+    msg = sock.recvfrom(1024)
+    if msg != "ready":
+        ValueError("Failed to prepare controller")
+
+
+def teardownController(sock, run_id):
+    sock.sendto("stop/%s" % run_id, ('192.168.56.1', CTRL_CMD_REMOTE_PORT))
+    msg = sock.recvfrom(1024)
+    if msg != "stopped":
+        ValueError("Failed to stop controller")
+
+
+def run():
     run_id = datetime.datetime.now().isoformat()
+    sock = setupControlerCommandChannel()
+    ctrlPrepare(sock, run_id)
     # k switches n hosts
     topo = LinearTopo(k=2, n=10, sopts={'protocols': 'OpenFlow13'})
     controller = RemoteController('c0', ip='192.168.56.1', port=6653)
@@ -220,7 +243,7 @@ def run():
         net.stop(),
         killPairs(net)
         os.system("pkill -9 beam")
-        sock.sendto("stop/%s" % run_id, ('192.168.56.1', CTRL_CMD_PORT))
+        teardownController(sock, run_id)
         info("**** FINISHED RUN ID: %s\n" % run_id)
 
 if __name__ == '__main__':
