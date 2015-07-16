@@ -18,7 +18,6 @@ DEFAULT_PORT = 8099
 SLEEP_SECS = 3
 CTRL_CMD_REMOTE_PORT = 6753
 CTRL_CMD_LOCAL_PORT = 6853
-servers = ['mn2']
 
 
 def runPassiveHosts(pair):
@@ -128,11 +127,13 @@ def runRmoteCmd(net, server, raw_cmd):
     return quietRun(cmd)
 
 
-def createDirs(run_id, net):
+def createDirs(run_id, net, servers):
     log_dir = logDir(run_id)
     config_dir = configDir(run_id)
     cmd = 'mkdir -p %s && mkdir -p %s' % (log_dir, config_dir)
     for s in servers:
+        if s == 'localhost':
+            continue
         output = runRmoteCmd(net, s, cmd)
         if output:
             raise ValueError("Failed to create dirs %s, %s. %s" % (log_dir,
@@ -231,7 +232,7 @@ def run(args):
     net = MininetCluster(topo=topo, servers=args.mn_hosts,
                          controller=controller)
     net.start()
-    createDirs(run_id, net)
+    createDirs(run_id, net, args.mn_hosts)
     try:
         pairs = designatePairs(net.hosts)
         setUpHostsFiles(run_id, pairs)
