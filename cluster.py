@@ -223,7 +223,7 @@ def teardownController(sock, run_id):
 def mk_run_id(args):
     run_id = '{tmstmp}-mh:{mn_hosts}-c:{containers}-sw:{switches}-it:{it}'
     return run_id.format(tmstmp=datetime.datetime.now().isoformat(),
-                         mn_hosts=args.mn_hosts,
+                         mn_hosts=len(args.mn_hosts),
                          containers=args.hosts,
                          switches=args.switches,
                          it=args.iterations)
