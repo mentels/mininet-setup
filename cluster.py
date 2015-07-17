@@ -220,17 +220,17 @@ def teardownController(sock, run_id):
         ValueError("Failed to stop controller")
 
 
-def run_id(args):
+def mk_run_id(args):
     run_id = '{tmstmp}-mh:{mn_hosts}-c:{containers}-sw:{switches}-it:{it}'
     return run_id.format(tmstmp=datetime.datetime.now().isoformat(),
                          mn_hosts=args.mn_hosts,
                          containers=args.hosts,
                          switches=args.switches,
-                         it=args.iterations
+                         it=args.iterations)
 
 
 def run(args):
-    run_id = run_id()
+    run_id = mk_run_id(args)
     sock = setupControlerCommandChannel(args.ctrl_cmd_local_port)
     ctrlPrepare(sock, run_id, args.ctrl_cmd_port)
     # k switches n hosts
