@@ -221,12 +221,15 @@ def teardownController(sock, run_id):
 
 
 def mk_run_id(args):
-    run_id = '{tmstmp}-mh:{mn_hosts}-c:{containers}-sw:{switches}-it:{it}'
+    run_id = ('{tmstmp}-mh:{mn_hosts}-c:{containers}-sw:{switches}-it:{it}' +
+              '-m:{mode}-sch:{schedulers_online}')
     return run_id.format(tmstmp=datetime.datetime.now().isoformat(),
                          mn_hosts=len(args.mn_hosts),
                          containers=args.hosts,
                          switches=args.switches,
-                         it=args.iterations)
+                         it=args.iterations,
+                         mode=args.mode,
+                         schedulers_online=args.schedulers_online)
 
 
 def run(args):
@@ -272,5 +275,7 @@ if __name__ == '__main__':
     parser.add_argument('--hosts', default=10, type=int)
     parser.add_argument('--sleep-time', default=3, type=int)
     parser.add_argument('--iterations', default=50, type=int)
+    parser.add_argument('--mode', default='regular')
+    parser.add_argument('--schedulers-online', default="default")
     setLogLevel('info')
     run(parser.parse_args())
