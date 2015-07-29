@@ -206,15 +206,15 @@ def setupControlerCommandChannel(local_port):
     return sock
 
 
-def ctrlPrepare(sock, run_id, remote_port):
-    sock.sendto("prepare/%s" % run_id, ('192.168.56.1', remote_port))
+def ctrlPrepare(sock, run_id, ctrl_ip, remote_port):
+    sock.sendto("prepare/%s" % run_id, (ctrl_ip, remote_port))
     msg = sock.recvfrom(1024)
     if msg != "ready":
         ValueError("Failed to prepare controller")
 
 
-def teardownController(sock, run_id):
-    sock.sendto("stop/%s" % run_id, ('192.168.56.1', CTRL_CMD_REMOTE_PORT))
+def teardownController(sock, ctrl_ip, run_id):
+    sock.sendto("stop/%s" % run_id, (ctrl_ip, CTRL_CMD_REMOTE_PORT))
     msg = sock.recvfrom(1024)
     if msg != "stopped":
         ValueError("Failed to stop controller")
@@ -235,7 +235,7 @@ def mk_run_id(args):
 def run(args):
     run_id = mk_run_id(args)
     sock = setupControlerCommandChannel(args.ctrl_cmd_local_port)
-    ctrlPrepare(sock, run_id, args.ctrl_cmd_port)
+    ctrlPrepare(sock, run_id, args.ctrl_ip, args.ctrl_cmd_port)
     # k switches n hosts
     topo = LinearTopo(k=args.switches, n=args.hosts,
                       sopts={'protocols': 'OpenFlow13'})
@@ -260,7 +260,7 @@ def run(args):
         net.stop(),
         killPairs(net)
         os.system("pkill -9 beam")
-        teardownController(sock, run_id)
+        teardownController(sock, args.ctrl_ip, run_id)
         info("**** FINISHED RUN ID: %s\n" % run_id)
 
 
