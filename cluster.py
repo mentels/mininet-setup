@@ -24,14 +24,20 @@ def runPassiveHosts(pair):
     (no, port, activeHost, passiveHost) = pair
     info('*** Starting pair no: %d \n' % no)
     passiveCmd = formatPairCmd(passiveHost.config)
-    passiveHost.cmd(passiveCmd)
+    output = passiveHost.cmd(passiveCmd)
+    if output:
+        raise ValueError("Failed to start passive host %s: %s"
+                         % (passiveHost.name, output))
     info('Started passive on %s: %s \n' % (passiveHost.name, passiveCmd))
 
 
 def runActiveHosts(pair):
     (no, port, activeHost, passiveHost) = pair
     activeCmd = formatPairCmd(activeHost.config)
-    activeHost.cmd(activeCmd)
+    output = activeHost.cmd(activeCmd)
+    if output:
+        raise ValueError("Failed to start active host %s: %s"
+                         % (activeHost.name, output))
     info('Started active on %s: %s \n' % (activeHost.name, activeCmd))
 
 
