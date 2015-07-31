@@ -183,7 +183,7 @@ def doWaitForFinish(pairs, finishedPairs):
 
 def pairFinished(pair):
     (no, port, activeHost, passiveHost) = pair
-    return hostFinished(activeHost) and hostFinished(passiveHost)
+    return hostFinished(activeHost)
 
 
 def hostFinished(host):
