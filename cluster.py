@@ -115,14 +115,17 @@ def generateSysConfig(no, port, host, peer, iterations, state):
                          % (host.name, output))
 
 
-def killPairs(net):
-    ip = net.serverIP['mn2']
-    dest = '%s@%s' % (net.user, ip)
-    cmd = ['sudo', '-E', '-u', net.user]
-    cmd += net.sshcmd + ['-n', dest, 'sudo pkill -9 beam']
-    info(' '.join(cmd), '\n')
-    quietRun(cmd),
-    quietRun('pkill -9 beam')
+def killPairs(servers):
+    for s in servers:
+        if s == "localhost":
+            quietRun('pkill -9 beam')
+        else:
+            ip = net.serverIP[s]
+            dest = '%s@%s' % (net.user, ip)
+            cmd = ['sudo', '-E', '-u', net.user]
+            cmd += net.sshcmd + ['-n', dest, 'sudo pkill -9 beam']
+            info(' '.join(cmd), '\n')
+            quietRun(cmd),
 
 
 def runRmoteCmd(net, server, raw_cmd):
@@ -264,7 +267,7 @@ def run(args):
         error("ERROR: %s \n" % arg)
     finally:
         net.stop(),
-        killPairs(net)
+        killPairs(args.mn_hosts)
         os.system("pkill -9 beam")
         teardownController(sock, args.ctrl_ip, run_id)
         info("**** FINISHED RUN ID: %s\n" % run_id)
