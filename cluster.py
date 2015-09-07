@@ -115,7 +115,7 @@ def generateSysConfig(no, port, host, peer, iterations, state):
                          % (host.name, output))
 
 
-def killPairs(servers):
+def killPairs(net, servers):
     for s in servers:
         if s == "localhost":
             quietRun('pkill -9 beam')
@@ -267,7 +267,7 @@ def run(args):
         error("ERROR: %s \n" % arg)
     finally:
         net.stop(),
-        killPairs(args.mn_hosts)
+        killPairs(net, args.mn_hosts)
         os.system("pkill -9 beam")
         teardownController(sock, args.ctrl_ip, run_id)
         info("**** FINISHED RUN ID: %s\n" % run_id)
